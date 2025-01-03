@@ -244,4 +244,46 @@
             justify-content: center;
         }
     }
+
+    @media (max-width: 768px) {
+        main {
+            padding: 10px 5px;
+        }
+
+        .game-header {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .stats-area {
+            font-size: 0.9em;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            font-size: 0.9em;
+        }
+    }
+
+    @media (max-width: 768px) {
+        main {
+            padding: 5px 2px;
+        }
+
+        .game-header {
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px 5px;
+        }
+
+        .tableau {
+            gap: 5px;  /* Reduce gap between columns */
+            padding: 0 2px;  /* Add minimal padding */
+            justify-content: space-between;  /* Distribute space evenly */
+        }
+
+        .end-stacks {
+            gap: 5px;
+        }
+    }
 </style>

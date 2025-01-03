@@ -84,6 +84,7 @@
 
 <div
     class="tableau-column {canAcceptKing ? 'can-accept-king' : ''} {isEmpty ? 'empty' : ''}"
+    data-column-index={columnIndex}
     style="
         min-height: {columnHeight}px;
         flex: 0 0 {columnWidth}px;

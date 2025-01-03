@@ -6,46 +6,46 @@
     import { gameStore } from "../stores/gameStore";
     import { dragStore } from "../stores/dragStore";
     import { layoutStore } from "../stores/layoutStore";
-
+    
     $: isSelected =
-        ($gameStore.selectedCard === index &&
-            $gameStore.selectedColumn === columnIndex) ||
-        ($gameStore.selectedColumn === columnIndex &&
-            $gameStore.selectedCard !== null &&
-            $gameStore.selectedCard < index &&
-            card.faceUp &&
-            areCardsInOrder(column.slice($gameStore.selectedCard, index + 1)));
-
+    ($gameStore.selectedCard === index &&
+    $gameStore.selectedColumn === columnIndex) ||
+    ($gameStore.selectedColumn === columnIndex &&
+    $gameStore.selectedCard !== null &&
+    $gameStore.selectedCard < index &&
+    card.faceUp &&
+    areCardsInOrder(column.slice($gameStore.selectedCard, index + 1)));
+    
     const suitSymbols = {
         hearts: "♥",
         diamonds: "♦",
         clubs: "♣",
         spades: "♠",
     };
-
+    
     function handleInteraction() {
         if (!card.faceUp) return;
-
+        
         // If no card is selected, select this card
         if ($gameStore.selectedCard === null) {
             gameStore.selectCard(columnIndex, index);
             return;
         }
-
+        
         // If clicking the same card, deselect it
         if (
-            $gameStore.selectedColumn === columnIndex &&
-            $gameStore.selectedCard === index
+        $gameStore.selectedColumn === columnIndex &&
+        $gameStore.selectedCard === index
         ) {
             gameStore.selectCard(null, null);
             return;
         }
-
+        
         // Moving to this column
         const sourceCol = $gameStore.selectedColumn;
         const sourceIdx = $gameStore.selectedCard;
         const sourceCard = $gameStore.tableau[sourceCol][sourceIdx];
-
+        
         // Moving to empty column
         if (column.length === 0) {
             if (sourceCard.value === "K") {
@@ -54,37 +54,37 @@
         } else {
             gameStore.moveCard(sourceCol, columnIndex, sourceIdx);
         }
-
+        
         gameStore.selectCard(null, null);
     }
-
+    
     function handleDoubleClick() {
         if (!card.faceUp) return;
         if (index < column.length - 1) return;
         gameStore.moveSequenceToEndStack(columnIndex, index);
     }
-
+    
     function handleRightClick(event) {
         event.preventDefault();
         if (!card.faceUp) return;
         if (index < column.length - 1) return;
         gameStore.moveSequenceToEndStack(columnIndex, index);
     }
-
+    
     function handleDragStart(event) {
         if (!card.faceUp) {
             event.preventDefault();
             return;
         }
-
+        
         const cardSequence = column.slice(index);
+        const ghostContainer = document.createElement("div");
         dragStore.startDrag(columnIndex, index, cardSequence.length);
-
+        
         const rect = event.target.getBoundingClientRect();
         const offsetX = event.clientX - rect.left;
         const offsetY = event.clientY - rect.top;
-
-        const ghostContainer = document.createElement("div");
+        
         ghostContainer.style.cssText = `
         position: fixed;
         left: -1000px;
@@ -94,15 +94,15 @@
         width: ${$layoutStore.cardWidth}px;
         background: transparent;
     `;
-
+        
         cardSequence.forEach((sequenceCard, i) => {
             const cardElement = document.createElement("div");
             const color =
-                sequenceCard.suit === "hearts" ||
-                sequenceCard.suit === "diamonds"
-                    ? "#e44145"
-                    : "#252525";
-
+            sequenceCard.suit === "hearts" ||
+            sequenceCard.suit === "diamonds"
+            ? "#e44145"
+            : "#252525";
+            
             cardElement.style.cssText = `
             position: absolute;
             top: ${i * $layoutStore.cardSpacing}px;
@@ -116,7 +116,7 @@
             transform-origin: 0 0;
             opacity: 1; /* Korttien näkyvyys */
         `;
-
+            
             cardElement.innerHTML = `
             <div style="position: relative; height: 100%; background: white; border-radius: 8px;">
                 <div style="position: absolute; top: 6px; left: 6px; display: flex; align-items: center; gap: 4px;">
@@ -130,116 +130,167 @@
                 </div>
             </div>
         `;
-
+            
             ghostContainer.appendChild(cardElement);
         });
-
         document.body.appendChild(ghostContainer);
-
+        
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setDragImage(ghostContainer, offsetX, offsetY);
-
-        event.dataTransfer.setData(
-            "text/plain",
-            JSON.stringify({
-                columnIndex,
-                cardIndex: index,
-            }),
-        );
-
+        event.dataTransfer.setData("text/plain", JSON.stringify({
+            columnIndex,
+            cardIndex: index,
+        }));
+        
         requestAnimationFrame(() => {
             document.body.removeChild(ghostContainer);
         });
     }
-
-    function handleDragEnd() {
+    
+    function handleDragEnd(event) {
+    requestAnimationFrame(() => {
+        const element = event.target;
+        if (element) {
+            element.style.transform = '';
+            element.style.visibility = 'visible';
+        }
         dragStore.reset();
-    }
-
-    $: shouldBeHidden =
-        $dragStore.isDragging &&
-        $dragStore.columnIndex === columnIndex &&
-        index >= $dragStore.startIndex;
-
+    });
+}
     function areCardsInOrder(cards) {
         if (cards.length <= 1) return true;
         for (let i = 0; i < cards.length - 1; i++) {
             if (
-                cards[i].suit !== cards[i + 1].suit ||
-                cards[i].numericValue !== cards[i + 1].numericValue - 1
+            cards[i].suit !== cards[i + 1].suit ||
+            cards[i].numericValue !== cards[i + 1].numericValue - 1
             ) {
                 return false;
             }
         }
         return true;
     }
-
+    
+    let touchStartPos = { x: 0, y: 0 };
     let touchStartTime = 0;
     let touchTimeout;
-
+    let isDragging = false;
+    
     function handleTouchStart(event) {
+        if (!card.faceUp) return;
+        
+        const touch = event.touches[0];
+        touchStartPos = { x: touch.clientX, y: touch.clientY };
         touchStartTime = Date.now();
+        isDragging = false;
         
         touchTimeout = setTimeout(() => {
-            if (card.faceUp) {
+            if (!isDragging && card.faceUp) {
                 handleRightClick(event);
             }
         }, 500);
     }
-
-    function handleTouchEnd(event) {
-        const touchDuration = Date.now() - touchStartTime;
-        clearTimeout(touchTimeout);
-
-        event.preventDefault();
-
-        if (touchDuration < 300) {
-            handleDoubleClick();
-            return;
+    
+    function handleTouchMove(event) {
+        if (!card.faceUp) return;
+        
+        const touch = event.touches[0];
+        const deltaX = touch.clientX - touchStartPos.x;
+        const deltaY = touch.clientY - touchStartPos.y;
+        
+        if (!isDragging && (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10)) {
+            isDragging = true;
+            clearTimeout(touchTimeout);
+            dragStore.startDrag(columnIndex, index, column.slice(index).length);
         }
-
-        handleInteraction();
+        
+        if (isDragging) {
+            event.preventDefault();
+            const element = event.target;
+            element.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        }
     }
-
-    function handleTouchMove() {
-        clearTimeout(touchTimeout);
+    
+    function handleTouchEnd(event) {
+    event.preventDefault();
+    clearTimeout(touchTimeout);
+    
+    const element = event.target;
+    const touchDuration = Date.now() - touchStartTime;
+    
+    if (isDragging) {
+        const touch = event.changedTouches[0];
+        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+        
+        if (dropTarget) {
+            const column = dropTarget.closest('[data-column-index]');
+            const endStack = dropTarget.closest('[data-stack-index]');
+            
+            if (column && column.dataset.columnIndex !== undefined) {
+                const toColumnIndex = parseInt(column.dataset.columnIndex);
+                if (!isNaN(toColumnIndex) && gameStore.canMoveCard(columnIndex, toColumnIndex, index)) {
+                    gameStore.moveCard(columnIndex, toColumnIndex, index);
+                }
+            } else if (endStack && endStack.dataset.stackIndex !== undefined) {
+                const toStackIndex = parseInt(endStack.dataset.stackIndex);
+                if (!isNaN(toStackIndex)) {
+                    gameStore.moveToEndStack(columnIndex, index, toStackIndex);
+                }
+            }
+        }
+        
+        element.style.transform = '';
+        dragStore.reset();
+        isDragging = false;
+    } else {
+        if (touchDuration < 300) {
+            handleInteraction();
+        }
     }
-
+}
+    
+    $: shouldBeHidden = $dragStore.isDragging && 
+    $dragStore.columnIndex === columnIndex && 
+    index >= $dragStore.startIndex;
+    
 </script>
 
 <button
-    class="card {card.faceUp ? 'face-up' : 'face-down'} {card.suit} 
-    {isSelected ? 'selected' : ''}"
-    style="
+class="card {card.faceUp ? 'face-up' : 'face-down'} {card.suit} 
+    {isSelected ? 'selected' : ''} {isDragging ? 'dragging' : ''}"
+style="
         top: {index * $layoutStore.cardSpacing}px;
         width: {$layoutStore.cardWidth}px;
         height: {$layoutStore.cardHeight}px;
         visibility: {shouldBeHidden ? 'hidden' : 'visible'};
+        touch-action: none;
+        will-change: transform;
+        position: absolute;
     "
-    draggable={card.faceUp}
-    on:click={handleInteraction}
-    on:keydown={handleInteraction}
-    on:dragstart={handleDragStart}
-    on:dragend={handleDragEnd}
-    on:dblclick={handleDoubleClick}
-    on:contextmenu={handleRightClick}
-    on:touchstart={handleTouchStart}
-    on:touchend={handleTouchEnd}
-    on:touchmove={handleTouchMove}
+draggable={card.faceUp}
+on:click={handleInteraction}
+on:keydown={handleInteraction}
+on:dragstart={handleDragStart}
+on:dragend={(event) => handleDragEnd(event)}
+on:drop|preventDefault={() => {}}
+on:dblclick={handleDoubleClick}
+on:contextmenu={handleRightClick}
+on:touchstart|preventDefault={handleTouchStart}
+on:touchmove|preventDefault={handleTouchMove}
+on:touchend|preventDefault={handleTouchEnd}
 >
-    {#if card.faceUp}
-        <div class="card-content">
-            <div class="corner top-left">
-                <span class="value">{card.value}</span>
-                <span class="suit">{suitSymbols[card.suit]}</span>
-            </div>
-            <div class="center-suit">{suitSymbols[card.suit]}</div>
-            <div class="corner bottom-right">
-                <span class="value">{card.value}</span>
-                <span class="suit">{suitSymbols[card.suit]}</span>
-            </div>
-        </div>
-    {/if}
+{#if card.faceUp}
+<div class="card-content">
+    <div class="corner top-left">
+        <span class="value">{card.value}</span>
+        <span class="suit">{suitSymbols[card.suit]}</span>
+    </div>
+    <div class="center-suit">{suitSymbols[card.suit]}</div>
+    <div class="corner bottom-right">
+        <span class="value">{card.value}</span>
+        <span class="suit">{suitSymbols[card.suit]}</span>
+    </div>
+</div>
+{/if}
 </button>
 
 <style>
@@ -250,38 +301,38 @@
         border: 1px solid rgba(0, 0, 0, 0.2);
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         transition:
-            transform 0.2s ease,
-            box-shadow 0.2s ease;
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
     }
-
+    
     .dragging {
         opacity: 1 !important;
         pointer-events: none;
     }
-
-    .face-up:hover:not(.dragging) {
+    
+    .face-up:hover:not(.dragging):not(.selected) {
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
-
+    
     .selected {
         border: 2px solid #ffd700;
         box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
         transform: translateY(-3px);
         z-index: 10;
     }
-
+    
     .selected.attached {
         box-shadow:
-            0 0 0 3px #ffd700,
-            0 4px 8px rgba(0, 0, 0, 0.3);
+        0 0 0 3px #ffd700,
+        0 4px 8px rgba(0, 0, 0, 0.3);
     }
-
+    
     .selected:hover {
         border: 2px solid #ffd700;
         box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
     }
-
+    
     .corner {
         position: absolute;
         display: flex;
@@ -291,18 +342,18 @@
         font-size: 1.4em;
         font-weight: bold;
     }
-
+    
     .top-left {
         top: 0;
         left: 0;
     }
-
+    
     .bottom-right {
         bottom: 0;
         right: 0;
         transform: rotate(180deg);
     }
-
+    
     .center-suit {
         position: absolute;
         top: 50%;
@@ -311,68 +362,76 @@
         font-size: 2.5em;
         opacity: 0.7;
     }
-
+    
     .card-content {
         height: 100%;
         position: relative;
     }
-
+    
     .face-up {
         cursor: pointer;
     }
-
-    .face-up:hover:not(.selected) {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    }
-
+    
     .face-down {
         background: linear-gradient(
-            45deg,
-            #006699 25%,
-            #005588 25%,
-            #005588 50%,
-            #006699 50%,
-            #006699 75%,
-            #005588 75%
+        45deg,
+        #006699 25%,
+        #005588 25%,
+        #005588 50%,
+        #006699 50%,
+        #006699 75%,
+        #005588 75%
         );
         background-size: 20px 20px;
         box-shadow:
-            0 1px 3px rgba(0, 0, 0, 0.3),
-            0 0 0 1px rgba(0, 0, 0, 0.2);
+        0 1px 3px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(0, 0, 0, 0.2);
     }
-
+    
     .hearts,
     .diamonds {
         color: #e44145;
     }
-
+    
     .spades,
     .clubs {
         color: #252525;
     }
-
+    
     .card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
-
+    
     @media (max-width: 768px) {
-        .corner {
-            font-size: calc(1em * var(--card-scale, 1));
+        .card {
+            border-radius: 4px;
         }
-
+        
+        .corner {
+            padding: 2px;
+            font-size: 1em;
+        }
+        
+        .value, .suit {
+            font-size: 0.9em;
+        }
+        
         .center-suit {
-            font-size: calc(1.5em * var(--card-scale, 1));
+            font-size: 1.4em;
+        }
+        
+        .card-content {
+            padding: 2px;
         }
     }
-
+    
     @media (hover: none) {
         .face-up:active {
             transform: scale(1.02);
             transition: transform 0.1s;
         }
-
+        
         .selected {
             transform: translateY(-3px) scale(1.02);
         }

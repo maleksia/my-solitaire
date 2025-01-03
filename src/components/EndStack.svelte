@@ -19,25 +19,27 @@
   }
 
   function handleDrop(event) {
-        event.preventDefault();
-        try {
-            const data = JSON.parse(event.dataTransfer.getData("text/plain"));
-            console.log("Drop on endstack:", data);
-            const fromColumn = data.columnIndex;
-            const cardIndex = data.cardIndex;
-            const column = $gameStore.tableau[fromColumn];
+    event.preventDefault();
+    try {
+        const data = JSON.parse(event.dataTransfer.getData("text/plain"));
+        const fromColumn = data.columnIndex;
+        const cardIndex = data.cardIndex;
+        const column = $gameStore.tableau[fromColumn];
+        const card = column[cardIndex];
 
-            if (cardIndex < column.length - 1) {
-                dragStore.reset();
-                return;
-            }
-
-            gameStore.moveToEndStack(fromColumn, cardIndex, stackIndex);
-        } catch (err) {
-            console.error("Drop error:", err);
+        if (cardIndex < column.length - 1 || !gameStore.canMoveToEndStack(card, stack[stack.length - 1])) {
+            event.dataTransfer.dropEffect = 'none';
             dragStore.reset();
+            return;
         }
+
+        gameStore.moveToEndStack(fromColumn, cardIndex, stackIndex);
+    } catch (err) {
+        console.error("Drop error:", err);
+        event.dataTransfer.dropEffect = 'none';
+        dragStore.reset();
     }
+}
 
     $: isRedSuit = stack.length > 0 && (stack[stack.length - 1].suit === "hearts" || stack[stack.length - 1].suit === "diamonds");
     $: shouldAnimate = $gameStore.winAnimation && $gameStore.winAnimationIndex === stackIndex && stack.length === 13;
@@ -46,6 +48,7 @@
 <div
 class="end-stack {shouldAnimate ? 'spin' : ''}"
 style="width: {$layoutStore.cardWidth}px; height: {$layoutStore.cardHeight}px;"
+data-stack-index={stackIndex}
 on:dragover={handleDragOver}
 on:drop={handleDrop}
 on:click={handleInteraction}
