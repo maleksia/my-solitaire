@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.DS_Store
+.env
+.vite/
+build/
+/todo.txt
+/__tests__/
