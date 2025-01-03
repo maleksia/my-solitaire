@@ -5,4 +5,4 @@ dist/
 .vite/
 build/
 /todo.txt
-/__tests__/
+/src/__tests__/
