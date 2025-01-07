@@ -102,10 +102,11 @@
                         >Undo</button
                     >
                     <button
-                    class="btn redeal"
-                    on:click={handleRedeal}
-                    disabled={$gameStore.difficulty === "normal" && $gameStore.redealsRemaining <= 0}
-                >
+                        class="btn redeal"
+                        on:click={handleRedeal}
+                        disabled={$gameStore.difficulty === "normal" &&
+                            $gameStore.redealsRemaining <= 0}
+                    >
                         Collect & Redeal ({$gameStore.difficulty === "easy"
                             ? "∞"
                             : $gameStore.redealsRemaining})
@@ -234,38 +235,6 @@
     }
 
     @media (max-width: 768px) {
-        .game-header {
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .controls-area {
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-    }
-
-    @media (max-width: 768px) {
-        main {
-            padding: 10px 5px;
-        }
-
-        .game-header {
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .stats-area {
-            font-size: 0.9em;
-        }
-
-        .btn {
-            padding: 6px 12px;
-            font-size: 0.9em;
-        }
-    }
-
-    @media (max-width: 768px) {
         main {
             padding: 5px 2px;
         }
@@ -276,14 +245,60 @@
             padding: 10px 5px;
         }
 
+        .stats-area {
+            font-size: 0.9em;
+        }
+
+        .controls-area {
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            font-size: 0.9em;
+        }
+
         .tableau {
-            gap: 5px;  /* Reduce gap between columns */
-            padding: 0 2px;  /* Add minimal padding */
-            justify-content: space-between;  /* Distribute space evenly */
+            gap: 1px;
+            padding: 0;
+            justify-content: space-between;
+            margin: 0 1px;
         }
 
         .end-stacks {
-            gap: 5px;
+            gap: 2px;
+            padding: 0;
+            justify-content: center;
+        }
+    }
+
+    @media (min-width: 769px) and (max-width: 1024px) {
+        main {
+            padding: 15px 10px;
+        }
+
+        .game-header {
+            padding: 15px;
+            gap: 15px;
+        }
+
+        .tableau {
+            gap: 10px;
+            padding: 0 5px;
+        }
+
+        .end-stacks {
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 7px 14px;
+            font-size: 0.95em;
+        }
+
+        .stats-area {
+            font-size: 0.95em;
         }
     }
 </style>

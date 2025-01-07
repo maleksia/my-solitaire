@@ -83,24 +83,26 @@
 </script>
 
 <div
-    class="tableau-column {canAcceptKing ? 'can-accept-king' : ''} {isEmpty ? 'empty' : ''}"
-    data-column-index={columnIndex}
-    style="
+  class="tableau-column {canAcceptKing ? 'can-accept-king' : ''} {isEmpty
+    ? 'empty'
+    : ''}"
+  data-column-index={columnIndex}
+  style="
         min-height: {columnHeight}px;
         flex: 0 0 {columnWidth}px;
     "
-    {renderKey}
-    on:dragover={handleDragOver}
-    on:dragleave={handleDragLeave}
-    on:drop={handleDrop}
-    role="button"
-    tabindex="0"
-    on:keydown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleColumnInteraction();
-        }
-    }}
+  {renderKey}
+  on:dragover={handleDragOver}
+  on:dragleave={handleDragLeave}
+  on:drop={handleDrop}
+  role="button"
+  tabindex="0"
+  on:keydown={(e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleColumnInteraction();
+    }
+  }}
 >
   {#if isEmpty}
     <div class="empty-placeholder">
@@ -115,44 +117,56 @@
 </div>
 
 <style>
+  .tableau-column {
+    position: relative;
+    margin: 0 2px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+  }
+
+  .empty {
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .empty-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2em;
+    color: rgba(255, 255, 255, 0.3);
+    font-family: serif;
+  }
+
+  .empty-text {
+    opacity: 0.5;
+    font-style: italic;
+  }
+
+  .tableau-column.can-accept-king {
+    border: 2px dashed rgba(255, 215, 0, 0.5);
+    background: rgba(255, 215, 0, 0.1);
+  }
+
+  .tableau-column.can-accept-king .empty-text {
+    color: rgba(255, 215, 0, 0.8);
+    opacity: 1;
+  }
+
+  @media (min-width: 769px) {
     .tableau-column {
-        position: relative;
-        margin: 0 10px;
-        border-radius: 8px;
-        transition: all 0.2s ease; 
+      margin: 0 5px;
     }
+  }
 
-    .empty {
-        border: 2px dashed rgba(255, 255, 255, 0.2);
-        background: rgba(255, 255, 255, 0.05);
+  @media (min-width: 1025px) {
+    .tableau-column {
+      margin: 0 10px;
     }
-
-    .empty-placeholder {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 2em;
-        color: rgba(255, 255, 255, 0.3);
-        font-family: serif;
-    }
-
-    .empty-text {
-        opacity: 0.5;
-        font-style: italic;
-    }
-
-    .tableau-column.can-accept-king {
-        border: 2px dashed rgba(255, 215, 0, 0.5);
-        background: rgba(255, 215, 0, 0.1);
-    }
-
-    .tableau-column.can-accept-king .empty-text {
-        color: rgba(255, 215, 0, 0.8);
-        opacity: 1;
-    }
+  }
 </style>
