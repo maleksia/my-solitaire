@@ -1,8 +1,15 @@
 <script>
     import { statsStore } from '../stores/statsStore';
+    import { gameStore } from '../stores/gameStore';
 
-    $: minutes = Math.floor($statsStore.currentGame.elapsedTime / 60000);
-    $: seconds = Math.floor(($statsStore.currentGame.elapsedTime % 60000) / 1000);
+    let elapsedTime = 0;
+
+    $: if (!$gameStore.isPaused) {
+        elapsedTime = $statsStore.currentGame.elapsedTime;
+    }
+
+    $: minutes = Math.floor(elapsedTime / 60000);
+    $: seconds = Math.floor((elapsedTime % 60000) / 1000);
     
     $: formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 </script>

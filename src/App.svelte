@@ -10,6 +10,7 @@
     import WinScreen from "./components/WinScreen.svelte";
     import { settingsStore } from "./stores/settingsStore";
     import WelcomeScreen from "./components/WelcomeScreen.svelte";
+    import PauseOverlay from "./components/PauseOverlay.svelte";
 
     let showRules = false;
     let showWelcome = true;
@@ -111,6 +112,9 @@
                             ? "∞"
                             : $gameStore.redealsRemaining})
                     </button>
+                    <button class="btn" on:click={() => gameStore.togglePause()}>
+                        {$gameStore.isPaused ? 'Resume' : 'Pause'}
+                    </button>
                 </div>
             </header>
 
@@ -129,6 +133,7 @@
         </div>
         <WinScreen {showWelcome} onNewGame={handleNewGame} />
         <Rules isOpen={showRules} on:close={() => (showRules = false)} />
+        <PauseOverlay />
     {/if}
 </main>
 

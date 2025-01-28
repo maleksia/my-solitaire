@@ -15,7 +15,8 @@ function createGameStore() {
     hasStarted: false,
     lastUpdate: Date.now(),
     winAnimation: false,
-    winAnimationIndex: -1
+    winAnimationIndex: -1,
+    isPaused: false // Add isPaused property
   });
 
   function newGame(difficulty = 'normal') {
@@ -31,8 +32,16 @@ function createGameStore() {
       selectedColumn: null,
       difficulty: difficulty,
       isGameWon: false,
-      lastUpdate: Date.now()
+      lastUpdate: Date.now(),
+      isPaused: false // Reset isPaused on new game
     });
+  }
+
+  function togglePause() {
+    update(state => ({
+      ...state,
+      isPaused: !state.isPaused
+    }));
   }
 
   function moveSelectedCard(fromColumn, fromIndex, toColumn) {
@@ -472,7 +481,8 @@ function createGameStore() {
     undo,
     newGame,
     forceRefresh,
-    canMoveCard
+    canMoveCard,
+    togglePause
   };
 
   return store;
