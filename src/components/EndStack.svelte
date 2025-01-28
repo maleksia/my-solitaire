@@ -106,6 +106,8 @@ tabindex="0"
     font-size: 1.5em;
     color: rgba(255, 255, 255, 0.1);
     letter-spacing: 3px;
+    width: 100%;
+    text-align: center;
   }
 
   .card {
@@ -128,7 +130,7 @@ tabindex="0"
     align-items: center;
     gap: 4px;
     padding: 6px;
-    font-size: 1.4em;
+    font-size: 2.4em;
     font-weight: bold;
   }
 
@@ -148,7 +150,7 @@ tabindex="0"
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 2.5em;
+    font-size: 2.7em;
     opacity: 0.7;
   }
 
@@ -169,13 +171,62 @@ tabindex="0"
 
   @media (max-width: 768px) {
     .corner {
+      padding: 2px;
       font-size: 1em;
     }
 
     .center-suit {
-      font-size: 1.5em;
+      font-size: 1.4em;
+    }
+
+    .empty-stack::before {
+      content: "♠♥\A♣♦";
+      white-space: pre;
+      line-height: 1.2;
+      letter-spacing: normal;
+      font-size: 1.2em;
+      width: 60%;
+      text-align: center;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
     }
   }
+  @media (max-width: 480px) {
+    .corner {
+      padding: 2px;
+      font-size: 0.9em;
+      gap: 2px;
+    }
+
+    .center-suit {
+      font-size: 1.2em;
+    }
+  }
+
+  @media (min-width: 481px) and (max-width: 768px) {
+    .corner {
+      padding: 3px;
+      font-size: 1.1em;
+    }
+
+    .center-suit {
+      font-size: 1.8em;
+    }
+  }
+
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .corner {
+      padding: 2px;
+      font-size: 2em;
+    }
+
+    .center-suit {
+      font-size: 1.9em;
+    }
+  }
+
   @keyframes spin {
     0% {
       transform: rotateY(0deg);

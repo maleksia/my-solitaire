@@ -26,6 +26,11 @@
           columnIndex,
           $gameStore.selectedCard,
         );
+        // Adjust position of attached cards
+        const attachedCards = $gameStore.tableau[$gameStore.selectedColumn].slice($gameStore.selectedCard);
+        attachedCards.forEach((card, index) => {
+          gameStore.moveCard($gameStore.selectedColumn, columnIndex, $gameStore.selectedCard + index);
+        });
       }
     }
   }
@@ -111,7 +116,13 @@
   {/if}
   {#key renderKey}
     {#each column as card, i}
-      <Card {card} {columnIndex} {column} index={i} onClick={handleCardClick} />
+      <Card 
+        {card} 
+        {columnIndex} 
+        {column} 
+        index={i} 
+        onClick={handleCardClick} 
+      />
     {/each}
   {/key}
 </div>
@@ -167,6 +178,18 @@
   @media (min-width: 1025px) {
     .tableau-column {
       margin: 0 10px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .tableau-column {
+      margin: 0 2px;
+    }
+  }
+
+  @media (min-width: 481px) and (max-width: 768px) {
+    .tableau-column {
+      margin: 0 3px;
     }
   }
 </style>
