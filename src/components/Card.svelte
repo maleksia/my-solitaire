@@ -3,18 +3,15 @@
     export let index;
     export let columnIndex;
     export let column;
+    export let selected = false;
+    export let partOfSelectedStack = false;
     import { gameStore } from "../stores/gameStore";
     import { dragStore } from "../stores/dragStore";
     import { layoutStore } from "../stores/layoutStore";
     
-    $: isSelected =
-    ($gameStore.selectedCard === index &&
-    $gameStore.selectedColumn === columnIndex) ||
-    ($gameStore.selectedColumn === columnIndex &&
-    $gameStore.selectedCard !== null &&
-    $gameStore.selectedCard < index &&
-    card.faceUp &&
-    areCardsInOrder(column.slice($gameStore.selectedCard, index + 1)));
+    $: isSelected = selected || partOfSelectedStack ||
+        ($gameStore.selectedColumn === columnIndex &&
+            $gameStore.selectedCard === index);
     
     const suitSymbols = {
         hearts: "♥",
@@ -79,21 +76,28 @@
         
         const cardSequence = column.slice(index);
         const ghostContainer = document.createElement("div");
-        dragStore.startDrag(columnIndex, index, cardSequence.length);
+        const dragData = JSON.stringify({ columnIndex, cardIndex: index });
+
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", dragData);
+        dragStore.startDrag(columnIndex, index, cardSequence.length, {
+            isNativeDrag: true
+        });
         
-        const rect = event.target.getBoundingClientRect();
+        const rect = event.currentTarget.getBoundingClientRect();
         const offsetX = event.clientX - rect.left;
         const offsetY = event.clientY - rect.top;
         
         ghostContainer.style.cssText = `
         position: fixed;
-        left: -1000px;
-        top: -1000px;
+        left: 0;
+        top: 0;
         z-index: 1000;
         pointer-events: none;
         width: ${$layoutStore.cardWidth}px;
+        height: ${$layoutStore.cardHeight + (cardSequence.length - 1) * $layoutStore.cardSpacing}px;
         background: transparent;
-        opacity: 1 !important;
+        opacity: 1;
     `;
         
         cardSequence.forEach((sequenceCard, i) => {
@@ -109,7 +113,7 @@
             background: white;
             border-radius: 8px;
             border: 1px solid rgba(0, 0, 0, 0.2);
-            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+            box-shadow: none;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             opacity: 1;
             transform-origin: 0 0;
@@ -136,43 +140,15 @@
             ghostContainer.appendChild(cardElement);
         });
         document.body.appendChild(ghostContainer);
-        
-        event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setDragImage(ghostContainer, offsetX, offsetY);
-        event.dataTransfer.setData("text/plain", JSON.stringify({
-            columnIndex,
-            cardIndex: index,
-        }));
+
+        requestAnimationFrame(() => ghostContainer.remove());
         
-        requestAnimationFrame(() => {
-            document.body.removeChild(ghostContainer);
-        });
     }
     
-    function handleDragEnd(event) {
-    requestAnimationFrame(() => {
-        const element = event.target;
-        if (element) {
-            element.style.transform = '';
-            element.style.visibility = 'visible';
-            element.classList.remove('dragging');
-        }
+    function handleDragEnd() {
         dragStore.reset();
-    });
 }
-    function areCardsInOrder(cards) {
-        if (cards.length <= 1) return true;
-        for (let i = 0; i < cards.length - 1; i++) {
-            if (
-            cards[i].suit !== cards[i + 1].suit ||
-            cards[i].numericValue !== cards[i + 1].numericValue - 1
-            ) {
-                return false;
-            }
-        }
-        return true;
-    }
-    
     let touchStartPos = { x: 0, y: 0 };
     let touchStartTime = 0;
     let touchTimeout;
@@ -203,13 +179,16 @@
         if (!isDragging && (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10)) {
             isDragging = true;
             clearTimeout(touchTimeout);
-            dragStore.startDrag(columnIndex, index, column.slice(index).length);
+            dragStore.startDrag(columnIndex, index, column.slice(index).length, {
+                position: { x: touch.clientX, y: touch.clientY },
+                offset: touchStartPos
+            });
         }
         
         if (isDragging) {
             event.preventDefault();
             dragStore.updateTouchPosition(touch.clientX, touch.clientY);
-            const element = event.target;
+            const element = event.currentTarget;
             element.style.opacity = '1';
             element.classList.add('dragging');
         }
@@ -219,7 +198,7 @@
         event.preventDefault();
         clearTimeout(touchTimeout);
         
-        const element = event.target;
+        const element = event.currentTarget;
         const touchDuration = Date.now() - touchStartTime;
         
         if (isDragging) {
@@ -255,35 +234,43 @@
         }
     }
     
-    $: shouldBeHidden = $dragStore.isDragging && 
-    $dragStore.columnIndex === columnIndex && 
-    index >= $dragStore.startIndex;
-    
+    $: isTouchDragSource = $dragStore.isDragging && !$dragStore.isNativeDrag &&
+        $dragStore.columnIndex === columnIndex && index >= $dragStore.startIndex;
+    $: touchDragX = $dragStore.position.x - $dragStore.offset.x;
+    $: touchDragY = $dragStore.position.y - $dragStore.offset.y;
+
 </script>
 
 <button
-class="card {card.faceUp ? 'face-up' : 'face-down'} {card.suit} 
-    {isSelected ? 'selected' : ''} {isDragging ? 'dragging' : ''}"
-style="
+    class="card {card.faceUp ? 'face-up' : 'face-down'} {card.suit}
+        {isSelected ? 'selected' : ''} {isDragging ? 'dragging' : ''}"
+    class:native-drag-source={$dragStore.isNativeDrag &&
+        $dragStore.columnIndex === columnIndex &&
+        index >= $dragStore.startIndex}
+    class:touch-drag-source={isTouchDragSource}
+    style="
         top: {index * $layoutStore.cardSpacing}px;
         width: {$layoutStore.cardWidth}px;
         height: {$layoutStore.cardHeight}px;
-        visibility: {shouldBeHidden ? 'hidden' : 'visible'};
         touch-action: none;
         will-change: transform;
         position: absolute;
+        transform: {isTouchDragSource
+            ? `translate3d(${touchDragX}px, ${touchDragY}px, 0)`
+            : ''};
+        z-index: {isTouchDragSource ? 1000 + index - $dragStore.startIndex : ''};
     "
-draggable={card.faceUp}
-on:click={handleInteraction}
-on:keydown={handleInteraction}
-on:dragstart={handleDragStart}
-on:dragend={(event) => handleDragEnd(event)}
-on:drop|preventDefault={() => {}}
-on:dblclick={handleDoubleClick}
-on:contextmenu={handleRightClick}
-on:touchstart|preventDefault={handleTouchStart}
-on:touchmove|preventDefault={handleTouchMove}
-on:touchend|preventDefault={handleTouchEnd}
+    draggable={card.faceUp}
+    on:click|stopPropagation={handleInteraction}
+    on:keydown={handleInteraction}
+    on:dragstart={handleDragStart}
+    on:dragend={handleDragEnd}
+    on:drop|preventDefault={() => {}}
+    on:dblclick={handleDoubleClick}
+    on:contextmenu={handleRightClick}
+    on:touchstart|preventDefault={handleTouchStart}
+    on:touchmove|preventDefault={handleTouchMove}
+    on:touchend|preventDefault={handleTouchEnd}
 >
 {#if card.faceUp}
 <div class="card-content">
@@ -306,6 +293,7 @@ on:touchend|preventDefault={handleTouchEnd}
         background: white;
         border-radius: 8px;
         border: 1px solid rgba(0, 0, 0, 0.2);
+        box-sizing: border-box;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         transition:
         transform 0.2s ease,
@@ -317,29 +305,35 @@ on:touchend|preventDefault={handleTouchEnd}
         pointer-events: none;
         z-index: 1000;
     }
+
+    .native-drag-source {
+        opacity: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .touch-drag-source {
+        pointer-events: none;
+        transition: none !important;
+        box-shadow: none !important;
+    }
     
     .face-up:hover:not(.dragging):not(.selected) {
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
     
-    .selected {
-        border: 2px solid #ffd700;
-        box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
-        z-index: 10;
+    .selected, .selected.attached {
+        border: 3px solid #ffd700 !important;
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.5) !important;
+        z-index: 100;
+        transform: translateY(-4px);
     }
     
-    .selected.attached {
-        box-shadow:
-        0 0 0 3px #ffd700,
-        0 4px 8px rgba(0, 0, 0, 0.3);
+    .selected:hover, .selected.attached:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 0 25px rgba(255, 215, 0, 0.6) !important;
     }
-    
-    .selected:hover {
-        border: 2px solid #ffd700;
-        box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
-    }
-    
+
     .corner {
         position: absolute;
         display: flex;
@@ -382,12 +376,12 @@ on:touchend|preventDefault={handleTouchEnd}
     .face-down {
         background: linear-gradient(
         45deg,
-        #006699 25%,
-        #005588 25%,
-        #005588 50%,
-        #006699 50%,
-        #006699 75%,
-        #005588 75%
+        var(--card-back-light, #0879bd) 25%,
+        var(--card-back-dark, #064577) 25%,
+        var(--card-back-dark, #064577) 50%,
+        var(--card-back-light, #0879bd) 50%,
+        var(--card-back-light, #0879bd) 75%,
+        var(--card-back-dark, #064577) 75%
         );
         background-size: 20px 20px;
         box-shadow:
@@ -433,12 +427,12 @@ on:touchend|preventDefault={handleTouchEnd}
 
         .corner {
             padding: 2px;
-            font-size: 0.8em;
+            font-size: 0.9em;
             gap: 2px;
         }
 
         .center-suit {
-            font-size: 0.9em;
+            font-size: 1.05em;
         }
 
         .selected {
@@ -479,5 +473,26 @@ on:touchend|preventDefault={handleTouchEnd}
         .card-content {
             padding: 2px;
         }
+    }
+
+    .selected {
+        border: 3px solid #ffd700 !important;
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.5) !important;
+        z-index: 100;
+    }
+
+    .selected:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 0 25px rgba(255, 215, 0, 0.6) !important;
+    }
+
+    .face-up:hover:not(.dragging) {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .face-up.selected:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 0 25px rgba(255, 215, 0, 0.6) !important;
     }
 </style>

@@ -37,20 +37,20 @@
 
   function handleDrop(event) {
     event.preventDefault();
+    const data = event.dataTransfer.getData("text/plain");
     try {
-      const data = JSON.parse(event.dataTransfer.getData("text/plain"));
-      const fromColumn = Number(data.columnIndex);
-      const cardIndex = Number(data.cardIndex);
+      if (!data) return;
 
-      if (!isNaN(fromColumn) && !isNaN(cardIndex)) {
-        if (gameStore.canMoveCard(fromColumn, columnIndex, cardIndex)) {
-          gameStore.moveCard(fromColumn, columnIndex, cardIndex);
-        }
+      const { columnIndex: fromColumn, cardIndex } = JSON.parse(data);
+      if (Number.isInteger(fromColumn) && Number.isInteger(cardIndex) &&
+          gameStore.canMoveCard(fromColumn, columnIndex, cardIndex)) {
+        gameStore.moveCard(fromColumn, columnIndex, cardIndex);
       }
     } catch (err) {
       console.error("Drop error:", err);
+    } finally {
+      dragStore.reset();
     }
-    dragStore.reset();
   }
 
   function handleColumnInteraction() {
@@ -59,19 +59,23 @@
     }
   }
 
-  $: canAcceptKing =
-    column.length === 0 &&
-    $gameStore.selectedCard !== null &&
-    $gameStore.tableau[$gameStore.selectedColumn]?.[$gameStore.selectedCard]
-      ?.value === "K";
+  $: canAcceptDrop =
+    $dragStore.isDragging &&
+    gameStore.canMoveCard(
+      $dragStore.columnIndex,
+      columnIndex,
+      $dragStore.startIndex
+    );
 
   function handleDragOver(event) {
     event.preventDefault();
-    event.currentTarget.classList.toggle("can-drop", canAcceptKing);
+    event.dataTransfer.dropEffect = "move";
   }
 
   function handleDragLeave(event) {
-    event.currentTarget.classList.remove("can-drop");
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      event.currentTarget.classList.remove("can-drop");
+    }
   }
 
   let renderKey = 0;
@@ -83,12 +87,13 @@
     renderKey++;
   }
   $: isEmpty = column.length === 0;
-  $: columnHeight = $layoutStore.cardHeight;
+  $: columnHeight = $layoutStore.cardHeight +
+    Math.max(0, column.length - 1) * $layoutStore.cardSpacing;
   $: columnWidth = $layoutStore.cardWidth;
 </script>
 
 <div
-  class="tableau-column {canAcceptKing ? 'can-accept-king' : ''} {isEmpty
+  class="tableau-column {canAcceptDrop ? 'can-drop' : ''} {isEmpty
     ? 'empty'
     : ''}"
   data-column-index={columnIndex}
@@ -121,6 +126,10 @@
         {columnIndex} 
         {column} 
         index={i} 
+        selected={$gameStore.selectedColumn === columnIndex &&
+          $gameStore.selectedCard !== null &&
+          i >= $gameStore.selectedCard &&
+          card.faceUp}
         onClick={handleCardClick} 
       />
     {/each}
@@ -133,6 +142,7 @@
     margin: 0 2px;
     border-radius: 8px;
     transition: all 0.2s ease;
+    box-sizing: border-box;
   }
 
   .empty {
@@ -146,6 +156,9 @@
     left: 0;
     right: 0;
     bottom: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -159,12 +172,13 @@
     font-style: italic;
   }
 
-  .tableau-column.can-accept-king {
-    border: 2px dashed rgba(255, 215, 0, 0.5);
-    background: rgba(255, 215, 0, 0.1);
+  .tableau-column.can-drop {
+    outline: 2px solid rgba(255, 215, 0, 0.8);
+    outline-offset: 3px;
+    background: rgba(255, 215, 0, 0.12);
   }
 
-  .tableau-column.can-accept-king .empty-text {
+  .tableau-column.can-drop .empty-text {
     color: rgba(255, 215, 0, 0.8);
     opacity: 1;
   }
@@ -185,6 +199,7 @@
     .tableau-column {
       margin: 0 2px;
     }
+
   }
 
   @media (min-width: 481px) and (max-width: 768px) {

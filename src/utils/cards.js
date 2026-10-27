@@ -38,18 +38,14 @@ export function createDeck() {
 }
 
 export function canStackCard(sourceCard, targetCard) {
-    console.log('Checking stack:', { sourceCard, targetCard });
-
     // Allow Kings to move to empty columns
     if (!targetCard) {
-        console.log('Empty column, checking for King');
         return sourceCard.value === 'K';
     }
 
     // Check if cards can be stacked (same suit, descending order)
     const canStack = sourceCard.suit === targetCard.suit &&
         sourceCard.numericValue === targetCard.numericValue - 1;
-    console.log('Can stack:', canStack);
     return canStack;
 }
 

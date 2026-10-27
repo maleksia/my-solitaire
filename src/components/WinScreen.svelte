@@ -4,6 +4,7 @@
 
     export let onNewGame;
     export let showWelcome;
+    export let showStats = true;
 
     function handleNewGame() {
         showWelcome = true;
@@ -23,16 +24,21 @@
             <h2 id="win-title">Congratulations!</h2>
             <p>You won the game!</p>
             <div class="stats">
-                <p>
-                    Time: {Math.floor(
-                        $statsStore.currentGame.elapsedTime / 60000,
-                    )}:{Math.floor(
-                        ($statsStore.currentGame.elapsedTime % 60000) / 1000,
-                    )
-                        .toString()
-                        .padStart(2, "0")}
-                </p>
-                <p>Moves: {$statsStore.currentGame.moves}</p>
+                {#if showStats}
+                    <p>
+                        Time: {Math.floor(
+                            $statsStore.currentGame.elapsedTime / 60000,
+                        )}:{Math.floor(
+                            ($statsStore.currentGame.elapsedTime % 60000) / 1000,
+                        )
+                            .toString()
+                            .padStart(2, "0")}
+                    </p>
+                    <p>Moves: {$statsStore.currentGame.moves}</p>
+                {/if}
+                <p>Redeals used: {$statsStore.currentGame.redealsUsed}</p>
+                <p>Games played: {$statsStore.gamesPlayed}</p>
+                <p>Games won: {$statsStore.gamesWon}</p>
             </div>
             <button class="new-game-btn" on:click={handleNewGame}>
                 Play Again
@@ -63,7 +69,19 @@
     }
 
     .stats {
-        margin: 1rem 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 8px;
+        margin: 1.25rem 0;
+    }
+
+    .stats p {
+        margin: 0;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: rgba(0, 77, 64, 0.08);
+        color: #2a4741;
+        font-weight: 600;
     }
 
     .new-game-btn {

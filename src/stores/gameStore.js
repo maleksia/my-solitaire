@@ -4,6 +4,7 @@ import { undoStore } from './undoStore';
 import { statsStore } from './statsStore';
 
 function createGameStore() {
+  let winAnimationTimeouts = [];
   const { subscribe, update, set } = writable({
     tableau: Array(7).fill().map(() => []),
     endStacks: Array(4).fill().map(() => []),
@@ -19,10 +20,47 @@ function createGameStore() {
     isPaused: false // Add isPaused property
   });
 
+  function createUndoSnapshot(state) {
+    return {
+      tableau: JSON.parse(JSON.stringify(state.tableau)),
+      endStacks: JSON.parse(JSON.stringify(state.endStacks)),
+      redealsRemaining: state.redealsRemaining,
+      redealsUsed: get(statsStore).currentGame.redealsUsed,
+      moves: get(statsStore).currentGame.moves,
+      hasStarted: state.hasStarted,
+      isGameWon: state.isGameWon,
+      winAnimation: state.winAnimation,
+      winAnimationIndex: state.winAnimationIndex
+    };
+  }
+
+  function saveUndoState(state) {
+    undoStore.pushState(createUndoSnapshot(state));
+  }
+
+  function clearWinAnimation() {
+    winAnimationTimeouts.forEach(clearTimeout);
+    winAnimationTimeouts = [];
+  }
+
+  function startWinAnimation() {
+    statsStore.stopTimer();
+    clearWinAnimation();
+    for (let i = 0; i < 4; i++) {
+      winAnimationTimeouts.push(setTimeout(() => {
+        update(state => state.isGameWon ? {
+          ...state,
+          winAnimationIndex: i
+        } : state);
+      }, i * 500));
+    }
+  }
+
   function newGame(difficulty = 'normal') {
-    statsStore.reset();
+    statsStore.startGame();
     const deck = shuffleDeck(createDeck());
     undoStore.clear();
+    clearWinAnimation();
     set({
       hasStarted: false,
       tableau: dealCards(deck),
@@ -33,85 +71,58 @@ function createGameStore() {
       difficulty: difficulty,
       isGameWon: false,
       lastUpdate: Date.now(),
-      isPaused: false // Reset isPaused on new game
+      isPaused: false,
+      winAnimation: false,
+      winAnimationIndex: -1
     });
   }
 
   function togglePause() {
+    const state = get(gameStore);
+    const isPausing = !state.isPaused;
+    if (isPausing) {
+      statsStore.pauseTimer();
+    } else if (state.hasStarted && !state.isGameWon) {
+      statsStore.startTimer();
+    }
     update(state => ({
       ...state,
-      isPaused: !state.isPaused
+      isPaused: isPausing
     }));
   }
 
-  function moveSelectedCard(fromColumn, fromIndex, toColumn) {
-    update(state => {
-      const sourceCards = state.tableau[fromColumn].slice(fromIndex);
-      const sourceCard = sourceCards[0];
-      const targetColumn = state.tableau[toColumn];
-
-      if (targetColumn.length === 0) {
-        if (sourceCard.value === 'K') {
-          const oldState = {
-            tableau: JSON.parse(JSON.stringify(state.tableau)),
-            endStacks: JSON.parse(JSON.stringify(state.endStacks)),
-            redealsRemaining: state.redealsRemaining
-          };
-
-          undoStore.pushState(oldState);
-          moveCard(fromColumn, toColumn, fromIndex);
-        }
-        return {
-          ...state,
-          selectedCard: null,
-          selectedColumn: null
-        };
-      }
-
-      if (canStackCard(sourceCard, targetColumn[targetColumn.length - 1])) {
-        moveCard(fromColumn, toColumn, fromIndex);
-      }
-
-      return {
-        ...state,
+  function selectCard(columnIndex, cardIndex) {
+    const state = get(gameStore);
+    if (state.isPaused || state.isGameWon) return;
+    if (columnIndex === null || cardIndex === null) {
+      update(current => ({
+        ...current,
         selectedCard: null,
         selectedColumn: null
-      };
-    });
-  }
+      }));
+      return;
+    }
 
-  function selectCard(columnIndex, cardIndex) {
-    update(state => {
-      if (columnIndex === null || cardIndex === null) {
-        return {
-          ...state,
-          selectedCard: null,
-          selectedColumn: null
-        };
-      }
+    if (!state.tableau[columnIndex]) return;
 
-      // Invalid column index
-      if (!state.tableau[columnIndex]) {
-        console.log('Invalid column index:', columnIndex);
-        return state;
-      }
+    if (state.selectedCard !== null) {
+      moveCard(state.selectedColumn, columnIndex, state.selectedCard);
+      update(current => ({
+        ...current,
+        selectedCard: null,
+        selectedColumn: null
+      }));
+      return;
+    }
 
-      // If we have a card selected, try to move it
-      if (state.selectedCard !== null) {
-        moveSelectedCard(state.selectedColumn, state.selectedCard, columnIndex, cardIndex);
-        return state;
-      }
+    const card = state.tableau[columnIndex][cardIndex];
+    if (!card || !card.faceUp) return;
 
-      // Select new card if face up
-      const card = state.tableau[columnIndex][cardIndex];
-      if (!card || !card.faceUp) return state;
-
-      return {
-        ...state,
-        selectedCard: cardIndex,
-        selectedColumn: columnIndex
-      };
-    });
+    update(current => ({
+      ...current,
+      selectedCard: cardIndex,
+      selectedColumn: columnIndex
+    }));
   }
 
   function forceRefresh() {
@@ -158,6 +169,9 @@ function createGameStore() {
   }
 
   function dealInitialCards() {
+    statsStore.startGame();
+    undoStore.clear();
+    clearWinAnimation();
     update(state => {
       const deck = shuffleDeck(createDeck());
       return {
@@ -167,23 +181,22 @@ function createGameStore() {
         redealsRemaining: 3,
         selectedCard: null,
         selectedColumn: null,
-        isGameWon: false
+        isGameWon: false,
+        hasStarted: false,
+        isPaused: false,
+        winAnimation: false,
+        winAnimationIndex: -1
       };
     });
   }
 
   function collectAndRedeal() {
     update(state => {
+      if (state.isPaused || state.isGameWon) return state;
       const isEasyMode = state.difficulty === 'easy';
       if (!isEasyMode && state.redealsRemaining <= 0) return state;
 
       // Save current state before modification
-      const oldState = {
-        tableau: JSON.parse(JSON.stringify(state.tableau)),
-        endStacks: JSON.parse(JSON.stringify(state.endStacks)),
-        redealsRemaining: state.redealsRemaining
-      };
-
       let collectedCards = [];
 
       // Process columns right to left (6 to 0)
@@ -212,7 +225,8 @@ function createGameStore() {
       const newRedealsRemaining = isEasyMode ? Infinity : state.redealsRemaining - 1;
 
       // Save old state to undo history before applying changes
-      undoStore.pushState(oldState);
+      saveUndoState(state);
+      statsStore.incrementRedeals();
 
       const newState = {
         ...state,
@@ -223,40 +237,32 @@ function createGameStore() {
         lastUpdate: Date.now()
       };
 
-      forceRefresh();
       return newState;
     });
   }
 
   function moveCard(fromColumn, toColumn, cardIndex) {
     update(state => {
-      if (!state.hasStarted) {
-        statsStore.startTimer();
-        state.hasStarted = true;
-      }
-
       if (fromColumn === toColumn) return state;
 
-      if (!state.tableau[fromColumn] || cardIndex >= state.tableau[fromColumn].length) {
+      if (state.isPaused || state.isGameWon ||
+        !state.tableau[fromColumn] || !state.tableau[toColumn] ||
+        !Number.isInteger(cardIndex) || cardIndex < 0 ||
+        cardIndex >= state.tableau[fromColumn].length) {
         return state;
       }
 
       const sourceCards = state.tableau[fromColumn].slice(cardIndex);
       const targetColumn = state.tableau[toColumn];
       const sourceCard = sourceCards[0];
-
-      // Save state before any changes
-      const oldState = {
-        tableau: JSON.parse(JSON.stringify(state.tableau)),
-        endStacks: JSON.parse(JSON.stringify(state.endStacks)),
-        redealsRemaining: state.redealsRemaining
-      };
+      if (!sourceCard.faceUp) return state;
 
       // Empty column - only allow Kings
       if (targetColumn.length === 0) {
         if (sourceCard.value === 'K') {
+          saveUndoState(state);
           statsStore.incrementMoves();
-          undoStore.pushState(oldState);
+          statsStore.startTimer();
 
           const newTableau = [...state.tableau];
           newTableau[fromColumn] = state.tableau[fromColumn].slice(0, cardIndex);
@@ -270,6 +276,7 @@ function createGameStore() {
           return {
             ...state,
             tableau: newTableau,
+            hasStarted: true,
             selectedCard: null,
             selectedColumn: null
           };
@@ -280,8 +287,9 @@ function createGameStore() {
       // Non-empty column - check if cards can stack
       const targetCard = targetColumn[targetColumn.length - 1];
       if (canStackCard(sourceCard, targetCard)) {
+        saveUndoState(state);
         statsStore.incrementMoves();
-        undoStore.pushState(oldState);
+        statsStore.startTimer();
 
         const newTableau = [...state.tableau];
         newTableau[fromColumn] = state.tableau[fromColumn].slice(0, cardIndex);
@@ -295,6 +303,7 @@ function createGameStore() {
         return {
           ...state,
           tableau: newTableau,
+          hasStarted: true,
           selectedCard: null,
           selectedColumn: null
         };
@@ -313,6 +322,11 @@ function createGameStore() {
 
   function moveToEndStack(fromColumn, cardIndex, stackIndex) {
     update(state => {
+      if (state.isPaused || state.isGameWon ||
+        !state.tableau[fromColumn] || !state.endStacks[stackIndex] ||
+        !Number.isInteger(cardIndex) || cardIndex < 0 ||
+        cardIndex >= state.tableau[fromColumn].length) return state;
+
       const card = state.tableau[fromColumn][cardIndex];
       const targetStack = state.endStacks[stackIndex];
       const topCard = targetStack.length > 0 ? targetStack[targetStack.length - 1] : null;
@@ -323,16 +337,10 @@ function createGameStore() {
         return state;
       }
 
-      if (canMoveToEndStack(card, topCard)) {
+      if (card.faceUp && canMoveToEndStack(card, topCard)) {
+        saveUndoState(state);
         statsStore.incrementMoves();
-
-        const oldState = {
-          tableau: JSON.parse(JSON.stringify(state.tableau)),
-          endStacks: JSON.parse(JSON.stringify(state.endStacks)),
-          redealsRemaining: state.redealsRemaining
-        };
-
-        undoStore.pushState(oldState);
+        statsStore.startTimer();
 
         const newTableau = [...state.tableau];
         const newEndStacks = [...state.endStacks];
@@ -345,13 +353,21 @@ function createGameStore() {
           newTableau[fromColumn][newTableau[fromColumn].length - 1].faceUp = true;
         }
 
+        const isGameWon = checkWin(newEndStacks);
+        if (isGameWon) {
+          statsStore.recordWin();
+          startWinAnimation();
+        }
         return {
           ...state,
           tableau: newTableau,
           endStacks: newEndStacks,
+          hasStarted: true,
           selectedCard: null,
           selectedColumn: null,
-          isGameWon: checkWin(newEndStacks)
+          isGameWon,
+          winAnimation: isGameWon,
+          winAnimationIndex: isGameWon ? 0 : -1
         };
       }
       return state;
@@ -359,24 +375,65 @@ function createGameStore() {
   }
 
   function undo() {
-    const previousState = undoStore.undo();
+    const currentState = get(gameStore);
+    const previousState = undoStore.undo(createUndoSnapshot(currentState));
     if (previousState) {
+      statsStore.setMoves(previousState.moves);
+      clearWinAnimation();
+      if (previousState.isGameWon) statsStore.stopTimer();
+      else if (previousState.hasStarted && !currentState.isPaused) statsStore.startTimer();
       set({
-        ...get(gameStore),
+        ...currentState,
         tableau: previousState.tableau,
         endStacks: previousState.endStacks,
         redealsRemaining: previousState.redealsRemaining,
+        hasStarted: previousState.hasStarted,
+        isGameWon: previousState.isGameWon,
+        winAnimation: previousState.winAnimation,
+        winAnimationIndex: previousState.winAnimationIndex,
         selectedCard: null,
         selectedColumn: null,
         lastUpdate: Date.now()
       });
+      statsStore.setRedealsUsed(previousState.redealsUsed);
+    }
+  }
+
+  function redo() {
+    const currentState = get(gameStore);
+    const nextState = undoStore.redo(createUndoSnapshot(currentState));
+    if (nextState) {
+      statsStore.setMoves(nextState.moves);
+      clearWinAnimation();
+      if (nextState.isGameWon) {
+        statsStore.stopTimer();
+      } else if (nextState.hasStarted && !currentState.isPaused) {
+        statsStore.startTimer();
+      }
+      set({
+        ...currentState,
+        tableau: nextState.tableau,
+        endStacks: nextState.endStacks,
+        redealsRemaining: nextState.redealsRemaining,
+        hasStarted: nextState.hasStarted,
+        isGameWon: nextState.isGameWon,
+        winAnimation: nextState.winAnimation,
+        winAnimationIndex: nextState.winAnimationIndex,
+        selectedCard: null,
+        selectedColumn: null,
+        lastUpdate: Date.now()
+      });
+      statsStore.setRedealsUsed(nextState.redealsUsed);
+      if (nextState.isGameWon) startWinAnimation();
     }
   }
 
   function moveSequenceToEndStack(fromColumn, startIndex) {
     update(state => {
+      if (state.isPaused || state.isGameWon) return state;
       const column = state.tableau[fromColumn];
-      if (!column || startIndex >= column.length) return state;
+      if (!column || !Number.isInteger(startIndex) ||
+        startIndex < 0 || startIndex >= column.length) return state;
 
       // Don't allow if card has attachments
       if (startIndex < column.length - 1) {
@@ -392,15 +449,9 @@ function createGameStore() {
         const topCard = stack.length > 0 ? stack[stack.length - 1] : null;
 
         if (canMoveToEndStack(card, topCard)) {
+          saveUndoState(state);
           statsStore.incrementMoves();
-
-          const oldState = {
-            tableau: JSON.parse(JSON.stringify(state.tableau)),
-            endStacks: JSON.parse(JSON.stringify(state.endStacks)),
-            redealsRemaining: state.redealsRemaining
-          };
-
-          undoStore.pushState(oldState);
+          statsStore.startTimer();
 
           const newTableau = [...state.tableau];
           const newEndStacks = [...state.endStacks];
@@ -417,13 +468,21 @@ function createGameStore() {
             newTableau[fromColumn][newTableau[fromColumn].length - 1].faceUp = true;
           }
 
+          const isGameWon = checkWin(newEndStacks);
+          if (isGameWon) {
+            statsStore.recordWin();
+            startWinAnimation();
+          }
           return {
             ...state,
             tableau: newTableau,
             endStacks: newEndStacks,
+            hasStarted: true,
             selectedCard: null,
             selectedColumn: null,
-            isGameWon: checkWin(newEndStacks)
+            isGameWon,
+            winAnimation: isGameWon,
+            winAnimationIndex: isGameWon ? 0 : -1
           };
         }
       }
@@ -432,32 +491,19 @@ function createGameStore() {
   }
 
   function checkWin(endStacks) {
-    const isWon = endStacks.every(stack => stack.length === 13);
-    if (isWon) {
-      statsStore.stopTimer();
-      update(state => ({
-        ...state,
-        isGameWon: true,
-        winAnimation: true,
-        winAnimationIndex: 0
-      }));
-
-      for (let i = 0; i < 4; i++) {
-        setTimeout(() => {
-          update(state => ({
-            ...state,
-            winAnimationIndex: i
-          }));
-        }, i * 500);
-      }
-    }
-    return isWon;
+    return endStacks.every(stack => stack.length === 13);
   }
 
   function canMoveCard(fromColumn, toColumn, cardIndex) {
     const state = get(gameStore);
+    if (state.isPaused || state.isGameWon ||
+      !state.tableau[fromColumn] || !state.tableau[toColumn] ||
+      !Number.isInteger(cardIndex) || cardIndex < 0 ||
+      cardIndex >= state.tableau[fromColumn].length) return false;
+
     const sourceCard = state.tableau[fromColumn][cardIndex];
     const targetColumn = state.tableau[toColumn];
+    if (!sourceCard.faceUp || fromColumn === toColumn) return false;
 
     // Moving to empty column
     if (targetColumn.length === 0) {
@@ -479,6 +525,7 @@ function createGameStore() {
     moveSequenceToEndStack,
     collectAndRedeal,
     undo,
+    redo,
     newGame,
     forceRefresh,
     canMoveCard,
@@ -490,5 +537,4 @@ function createGameStore() {
 
 // Create and export store instance
 const gameStore = createGameStore();
-console.log('Game store created with methods:', Object.keys(gameStore));
 export { gameStore };

@@ -16,20 +16,22 @@
 
   function handleDragOver(event) {
     event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
   }
 
   function handleDrop(event) {
     event.preventDefault();
     try {
-        const data = JSON.parse(event.dataTransfer.getData("text/plain"));
-        const fromColumn = data.columnIndex;
-        const cardIndex = data.cardIndex;
+        const payload = event.dataTransfer.getData("text/plain");
+        if (!payload) return;
+        const { columnIndex: fromColumn, cardIndex } = JSON.parse(payload);
         const column = $gameStore.tableau[fromColumn];
-        const card = column[cardIndex];
+        const card = column?.[cardIndex];
 
-        if (cardIndex < column.length - 1 || !gameStore.canMoveToEndStack(card, stack[stack.length - 1])) {
+        if (!Number.isInteger(fromColumn) || !Number.isInteger(cardIndex) ||
+            !card || cardIndex !== column.length - 1 ||
+            !gameStore.canMoveToEndStack(card, stack[stack.length - 1] || null)) {
             event.dataTransfer.dropEffect = 'none';
-            dragStore.reset();
             return;
         }
 
@@ -37,16 +39,23 @@
     } catch (err) {
         console.error("Drop error:", err);
         event.dataTransfer.dropEffect = 'none';
+    } finally {
         dragStore.reset();
     }
 }
 
+    $: draggedColumn = $gameStore.tableau[$dragStore.columnIndex];
+    $: draggedCard = draggedColumn?.[$dragStore.startIndex];
+    $: canAcceptDrop = $dragStore.isDragging &&
+      $dragStore.sequenceLength === 1 &&
+      !!draggedCard &&
+      gameStore.canMoveToEndStack(draggedCard, stack[stack.length - 1] || null);
     $: isRedSuit = stack.length > 0 && (stack[stack.length - 1].suit === "hearts" || stack[stack.length - 1].suit === "diamonds");
     $: shouldAnimate = $gameStore.winAnimation && $gameStore.winAnimationIndex === stackIndex && stack.length === 13;
 </script>
 
 <div
-class="end-stack {shouldAnimate ? 'spin' : ''}"
+class="end-stack {shouldAnimate ? 'spin' : ''} {canAcceptDrop ? 'can-drop' : ''}"
 style="width: {$layoutStore.cardWidth}px; height: {$layoutStore.cardHeight}px;"
 data-stack-index={stackIndex}
 on:dragover={handleDragOver}
@@ -87,6 +96,12 @@ tabindex="0"
 
   .end-stack:hover {
     border-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .end-stack.can-drop {
+    border-color: #ffd700;
+    box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.35);
+    transform: translateY(-2px);
   }
 
   .empty-stack {

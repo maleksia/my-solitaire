@@ -9,33 +9,41 @@ function createUndoStore() {
     let store = {
         subscribe,
         pushState: (state) => {
-            console.log("Pushing state:", state);
             update(history => ({
                 past: [...history.past, state],
                 future: []
             }));
         },
-        undo: () => {
-            const currentState = get(undoStore);  // Use the store itself
-            console.log("Current undo history:", currentState);
-
-            if (currentState.past.length === 0) {
-                console.log("No moves to undo");
+        undo: (stateBeforeUndo) => {
+            const history = get(undoStore);
+            if (history.past.length === 0) {
                 return null;
             }
 
-            const lastState = currentState.past[currentState.past.length - 1];
-            console.log("Restoring state:", lastState);
+            const lastState = history.past[history.past.length - 1];
 
-            update(history => ({
-                past: history.past.slice(0, -1),
-                future: [lastState, ...history.future]
+            update(currentHistory => ({
+                past: currentHistory.past.slice(0, -1),
+                future: [stateBeforeUndo, ...currentHistory.future]
             }));
 
             return lastState;
         },
+        redo: (currentState) => {
+            const history = get(undoStore);
+            if (history.future.length === 0) {
+                return null;
+            }
+
+            const nextState = history.future[0];
+            update(currentHistory => ({
+                past: [...currentHistory.past, currentState],
+                future: currentHistory.future.slice(1)
+            }));
+
+            return nextState;
+        },
         clear: () => {
-            console.log("Clearing undo history");
             set({
                 past: [],
                 future: []

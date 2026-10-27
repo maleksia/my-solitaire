@@ -1,6 +1,5 @@
 <script>
     import { settingsStore } from "../stores/settingsStore";
-    import { gameStore } from "../stores/gameStore";
     import { fade } from "svelte/transition";
     export let onStartGame;
 
@@ -10,8 +9,6 @@
     };
 
     function handleStartGame() {
-        gameStore.dealInitialCards();
-        gameStore.newGame($settingsStore.difficulty);
         onStartGame();
     }
 
@@ -91,27 +88,39 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.8);
+        background: rgba(0, 31, 27, 0.72);
         display: flex;
         justify-content: center;
         align-items: center;
         z-index: 1000;
+        padding: 20px;
+        backdrop-filter: blur(6px);
+        box-sizing: border-box;
     }
 
     .welcome-content {
-        background: #2a4741;
-        padding: 2rem;
-        border-radius: 8px;
+        width: min(100%, 440px);
+        background: linear-gradient(155deg, #24564b, #183d37);
+        padding: clamp(24px, 6vw, 40px);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 18px;
         text-align: center;
         color: white;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
+        box-sizing: border-box;
+    }
+
+    h1 {
+        margin: 0;
+        font-size: clamp(2.2rem, 8vw, 3.2rem);
+        letter-spacing: 0.04em;
     }
 
     .settings {
-        margin: 2rem 0;
+        margin: 28px 0;
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        gap: 20px;
     }
 
     .setting-group {
@@ -121,19 +130,33 @@
         justify-content: center;
     }
 
+    .setting-group > label:first-child {
+        font-weight: 600;
+    }
+
     .start-btn {
-        padding: 0.75rem 2rem;
+        width: 100%;
+        padding: 0.85rem 2rem;
         font-size: 1.2rem;
-        background: #4caf50;
+        font-weight: 700;
+        background: #27a767;
         color: white;
         border: none;
-        border-radius: 4px;
+        border-radius: 10px;
         cursor: pointer;
-        transition: background 0.2s;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+        transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
     }
 
     .start-btn:hover {
-        background: #45a049;
+        background: #2fbd78;
+        transform: translateY(-2px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.26);
+    }
+
+    .start-btn:focus-visible {
+        outline: 3px solid #ffe27a;
+        outline-offset: 3px;
     }
 
     .toggle {
@@ -234,5 +257,16 @@
         font-style: italic;
         text-align: center;
         min-height: 1.2em;
+    }
+
+    @media (max-width: 420px) {
+        .setting-group {
+            gap: 10px;
+        }
+
+        .radio-group {
+            gap: 12px;
+            margin-left: 0;
+        }
     }
 </style>

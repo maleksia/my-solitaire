@@ -3,6 +3,7 @@ import { writable } from 'svelte/store';
 function createDragStore() {
     const { subscribe, update, set } = writable({
         isDragging: false,
+        isNativeDrag: false,
         columnIndex: null,
         startIndex: null,
         sequenceLength: 0,
@@ -13,14 +14,20 @@ function createDragStore() {
 
     return {
         subscribe,
-        startDrag: (columnIndex, startIndex, sequenceLength, cards, position, offset) => set({
-            isDragging: true,
+        startDrag: (
             columnIndex,
             startIndex,
             sequenceLength,
-            cards: cards || [],
-            position: position || { x: 0, y: 0 },
-            offset: offset || { x: 0, y: 0 }
+            { cards = [], position = { x: 0, y: 0 }, offset = { x: 0, y: 0 }, isNativeDrag = false } = {}
+        ) => set({
+            isDragging: true,
+            isNativeDrag,
+            columnIndex,
+            startIndex,
+            sequenceLength,
+            cards,
+            position,
+            offset
         }),
         updateTouchPosition: (x, y) => update(state => ({
             ...state,
@@ -28,6 +35,7 @@ function createDragStore() {
         })),
         reset: () => set({
             isDragging: false,
+            isNativeDrag: false,
             columnIndex: null,
             startIndex: null,
             sequenceLength: 0,

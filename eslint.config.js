@@ -30,5 +30,13 @@ export default [
         languageOptions: {
             parser: svelteParser
         }
+    },
+    {
+        files: ['src/__tests__/**/*.js'],
+        languageOptions: {
+            globals: {
+                ...globals.jest
+            }
+        }
     }
 ];

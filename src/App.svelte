@@ -8,48 +8,51 @@
     import Timer from "./components/Timer.svelte";
     import Rules from "./components/Rules.svelte";
     import WinScreen from "./components/WinScreen.svelte";
-    import { settingsStore } from "./stores/settingsStore";
+    import {
+        settingsStore,
+        DECK_THEMES,
+        PLAY_AREA_THEMES
+    } from "./stores/settingsStore";
     import WelcomeScreen from "./components/WelcomeScreen.svelte";
     import PauseOverlay from "./components/PauseOverlay.svelte";
+    import SettingsPanel from "./components/SettingsPanel.svelte";
 
     let showRules = false;
+    let showSettings = false;
     let showWelcome = true;
 
     function initGame() {
         showWelcome = false;
-        gameStore.dealInitialCards();
         gameStore.newGame($settingsStore.difficulty);
     }
 
     onMount(() => {
         layoutStore.updateLayout();
+        const unsubscribeSettings = settingsStore.subscribe(settings => {
+            layoutStore.setCardScale(settings.cardScale);
+            const deckTheme = DECK_THEMES[settings.deckTheme];
+            const playAreaTheme = PLAY_AREA_THEMES[settings.playAreaTheme];
+            document.documentElement.style.setProperty("--card-back-light", deckTheme.light);
+            document.documentElement.style.setProperty("--card-back-dark", deckTheme.dark);
+            document.documentElement.style.setProperty("--felt-start", playAreaTheme.start);
+            document.documentElement.style.setProperty("--felt-end", playAreaTheme.end);
+        });
         window.addEventListener("resize", layoutStore.updateLayout);
         window.addEventListener("keydown", handleKeydown);
         return () => {
+            unsubscribeSettings();
             window.removeEventListener("resize", layoutStore.updateLayout);
             window.removeEventListener("keydown", handleKeydown);
         };
     });
 
     function handleRedeal() {
-        console.log("Redeal clicked");
         if ($gameStore.redealsRemaining > 0) {
-            console.log("Calling collectAndRedeal...");
             gameStore.collectAndRedeal();
         }
     }
 
-    function handleBackgroundInteraction(event) {
-        if (event.target === event.currentTarget) {
-            gameStore.selectCard(null, null);
-        }
-    }
-
     function handleKeydown(event) {
-        if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            handleBackgroundInteraction(event);
-        }
         if (event.ctrlKey) {
             if (event.key === "z") {
                 event.preventDefault();
@@ -68,7 +71,13 @@
         gameStore.redo();
     }
 
-    function handleNewGame() {
+    function handleNewGame(fromWinScreen = false) {
+        if (fromWinScreen) {
+            gameStore.newGame($settingsStore.difficulty);
+            showWelcome = false;
+            return;
+        }
+
         if (confirm("Start a new game? Current progress will be lost.")) {
             statsStore.reset();
             showWelcome = true;
@@ -87,12 +96,17 @@
         <div class="game-container">
             <header class="game-header">
                 <div class="stats-area">
-                    <Timer />
-                    <div class="moves">
-                        Moves: {$statsStore.currentGame.moves}
-                    </div>
+                    {#if $settingsStore.timerEnabled}
+                        <Timer />
+                        <div class="moves">
+                            Moves: {$statsStore.currentGame.moves}
+                        </div>
+                    {/if}
                     <button class="btn info" on:click={handleRulesToggle}
                         >Rules</button
+                    >
+                    <button class="btn" on:click={() => (showSettings = true)}
+                        >Settings</button
                     >
                 </div>
                 <div class="controls-area">
@@ -131,23 +145,40 @@
                 </div>
             </div>
         </div>
-        <WinScreen {showWelcome} onNewGame={handleNewGame} />
+        <WinScreen
+            {showWelcome}
+            showStats={$settingsStore.timerEnabled}
+            onNewGame={() => handleNewGame(true)}
+        />
         <Rules isOpen={showRules} on:close={() => (showRules = false)} />
+        {#if showSettings}
+            <SettingsPanel on:close={() => (showSettings = false)} />
+        {/if}
         <PauseOverlay />
     {/if}
 </main>
 
 <style>
+    :global(html) {
+        min-height: 100%;
+        background: linear-gradient(
+            135deg,
+            var(--felt-start, #004d40) 0%,
+            var(--felt-end, #00695c) 100%
+        ) fixed;
+        background-color: var(--felt-start, #004d40);
+    }
+
     :global(body) {
         margin: 0;
         padding: 0;
         min-height: 100vh;
-        background: linear-gradient(135deg, #004d40 0%, #00695c 100%);
+        background: transparent;
     }
 
     main {
         min-height: 100vh;
-        background: linear-gradient(135deg, #004d40 0%, #00695c 100%);
+        background: transparent;
         padding: 20px;
         box-sizing: border-box;
     }
@@ -163,9 +194,14 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 20px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding: 16px 20px;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 14px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+        backdrop-filter: blur(12px);
         margin-bottom: 20px;
     }
 
@@ -181,41 +217,57 @@
     }
 
     .btn {
-        padding: 8px 16px;
+        padding: 9px 15px;
         border: none;
-        border-radius: 4px;
-        background: #4a6964;
+        border-radius: 8px;
+        background: #345b54;
         color: white;
         cursor: pointer;
-        font-size: 1em;
-        transition: background 0.2s;
+        font-size: 0.94em;
+        font-weight: 600;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.14);
+        transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
     }
 
     .btn:hover {
-        background: #5a7974;
+        background: #426d65;
+        transform: translateY(-1px);
+        box-shadow: 0 5px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn:focus-visible {
+        outline: 3px solid rgba(255, 215, 0, 0.9);
+        outline-offset: 2px;
     }
 
     .btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
     }
 
     .btn.primary {
-        background: #28a745;
+        background: #218c54;
     }
 
     .btn.redeal {
-        background: #dc3545;
+        background: #a8474d;
     }
 
     .btn.info {
-        background: #17a2b8;
+        background: #247f8c;
     }
 
     .play-area {
         display: flex;
         flex-direction: column;
-        gap: 40px;
+        gap: clamp(24px, 4vw, 40px);
+        padding: 20px 12px 28px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 16px;
+        background: rgba(0, 55, 47, 0.16);
+        box-sizing: border-box;
     }
 
     .end-stacks {
@@ -231,32 +283,38 @@
     }
 
     .moves {
-        font-size: 1.5em;
+        font-size: 1.15em;
         font-family: monospace;
-        padding: 5px 10px;
-        background: rgba(0, 0, 0, 0.1);
-        border-radius: 4px;
-        margin: 0 10px;
+        padding: 9px 12px;
+        background: rgba(0, 0, 0, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: rgba(255, 255, 255, 0.94);
     }
 
     @media (max-width: 768px) {
         main {
-            padding: 5px 2px;
+            padding: 10px 8px;
         }
 
         .game-header {
             flex-direction: column;
-            gap: 10px;
-            padding: 10px 5px;
+            align-items: stretch;
+            gap: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
         }
 
         .stats-area {
             font-size: 0.9em;
+            justify-content: center;
+            flex-wrap: wrap;
         }
 
         .controls-area {
             flex-wrap: wrap;
             justify-content: center;
+            gap: 8px;
         }
 
         .btn {
@@ -265,16 +323,26 @@
         }
 
         .tableau {
-            gap: 1px;
+            gap: 0;
             padding: 0;
-            justify-content: space-between;
-            margin: 0 1px;
+            justify-content: flex-start;
+            width: max-content;
+            min-width: 100%;
+            margin: 0;
         }
 
         .end-stacks {
-            gap: 2px;
+            gap: 4px;
             padding: 0;
             justify-content: center;
+        }
+
+        .play-area {
+            width: 100%;
+            min-height: 62vh;
+            padding: 12px 4px 20px;
+            gap: 20px;
+            overflow-x: auto;
         }
     }
 
