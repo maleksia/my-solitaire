@@ -1,4 +1,5 @@
 import { get } from 'svelte/store';
+import { jest } from '@jest/globals';
 import { gameStore } from '../stores/gameStore.js';
 import { statsStore } from '../stores/statsStore.js';
 import { settingsStore } from '../stores/settingsStore.js';
@@ -50,6 +51,54 @@ describe('Solitaire game actions', () => {
                 expect(statsAfter.gamesPlayed).toBe(statsBefore.gamesPlayed + 1);
                 expect(statsAfter.gamesWon).toBe(statsBefore.gamesWon + 1);
                 expect(statsAfter.currentGame.redealsUsed).toBe(1);
+            });
+
+            test('tracks game results and best winning records separately by difficulty', () => {
+                jest.useFakeTimers();
+                try {
+                    const statsBefore = get(statsStore);
+                    const finishTimedWin = (difficulty, elapsedTime, moves) => {
+                        statsStore.startGame(difficulty);
+                        statsStore.startTimer();
+                        jest.advanceTimersByTime(elapsedTime);
+                        statsStore.stopTimer();
+                        for (let move = 0; move < moves; move++) {
+                            statsStore.incrementMoves();
+                        }
+                        statsStore.recordWin();
+                    };
+
+                    finishTimedWin('easy', 4000, 5);
+                    finishTimedWin('easy', 3000, 7);
+                    finishTimedWin('easy', 5000, 3);
+                    finishTimedWin('normal', 2000, 4);
+
+                    const statsAfter = get(statsStore);
+                    expect(statsAfter.gamesPlayed).toBe(statsBefore.gamesPlayed + 4);
+                    expect(statsAfter.gamesWon).toBe(statsBefore.gamesWon + 4);
+                    expect(statsAfter.byDifficulty.easy).toMatchObject({
+                        gamesPlayed: statsBefore.byDifficulty.easy.gamesPlayed + 3,
+                        gamesWon: statsBefore.byDifficulty.easy.gamesWon + 3,
+                        bestTimeMs: statsBefore.byDifficulty.easy.bestTimeMs === null
+                            ? 3000
+                            : Math.min(statsBefore.byDifficulty.easy.bestTimeMs, 3000),
+                        fewestMoves: statsBefore.byDifficulty.easy.fewestMoves === null
+                            ? 3
+                            : Math.min(statsBefore.byDifficulty.easy.fewestMoves, 3)
+                    });
+                    expect(statsAfter.byDifficulty.normal).toMatchObject({
+                        gamesPlayed: statsBefore.byDifficulty.normal.gamesPlayed + 1,
+                        gamesWon: statsBefore.byDifficulty.normal.gamesWon + 1,
+                        bestTimeMs: statsBefore.byDifficulty.normal.bestTimeMs === null
+                            ? 2000
+                            : Math.min(statsBefore.byDifficulty.normal.bestTimeMs, 2000),
+                        fewestMoves: statsBefore.byDifficulty.normal.fewestMoves === null
+                            ? 4
+                            : Math.min(statsBefore.byDifficulty.normal.fewestMoves, 4)
+                    });
+                } finally {
+                    jest.useRealTimers();
+                }
             });
         });
     });

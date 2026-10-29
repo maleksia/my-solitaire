@@ -58,7 +58,7 @@ function createGameStore() {
   }
 
   function newGame(difficulty = 'normal') {
-    statsStore.startGame();
+    statsStore.startGame(difficulty);
     const deck = shuffleDeck(createDeck());
     undoStore.clear();
     clearWinAnimation();
