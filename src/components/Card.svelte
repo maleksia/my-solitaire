@@ -8,6 +8,8 @@
     import { gameStore } from "../stores/gameStore";
     import { dragStore } from "../stores/dragStore";
     import { layoutStore } from "../stores/layoutStore";
+    let dragPreview;
+    let dragPreviewMoveHandler;
     
     $: isSelected = selected || partOfSelectedStack ||
         ($gameStore.selectedColumn === columnIndex &&
@@ -67,8 +69,21 @@
         if (index < column.length - 1) return;
         gameStore.moveSequenceToEndStack(columnIndex, index);
     }
+
+    function cleanupDragPreview() {
+        if (dragPreviewMoveHandler) {
+            document.removeEventListener("dragover", dragPreviewMoveHandler);
+            document.removeEventListener("drop", cleanupDragPreview);
+            document.removeEventListener("dragend", cleanupDragPreview);
+            dragPreviewMoveHandler = null;
+        }
+        dragPreview?.remove();
+        dragPreview = null;
+        dragStore.reset();
+    }
     
     function handleDragStart(event) {
+        cleanupDragPreview();
         if (!card.faceUp) {
             event.preventDefault();
             return;
@@ -90,14 +105,15 @@
         
         ghostContainer.style.cssText = `
         position: fixed;
-        left: 0;
-        top: 0;
+        left: ${event.clientX - offsetX}px;
+        top: ${event.clientY - offsetY}px;
         z-index: 1000;
         pointer-events: none;
         width: ${$layoutStore.cardWidth}px;
         height: ${$layoutStore.cardHeight + (cardSequence.length - 1) * $layoutStore.cardSpacing}px;
         background: transparent;
         opacity: 1;
+        filter: none;
     `;
         
         cardSequence.forEach((sequenceCard, i) => {
@@ -110,12 +126,13 @@
             top: ${i * $layoutStore.cardSpacing}px;
             width: ${$layoutStore.cardWidth}px;
             height: ${$layoutStore.cardHeight}px;
-            background: white;
+            background: #fff;
             border-radius: 8px;
-            border: 1px solid rgba(0, 0, 0, 0.2);
-            box-shadow: none;
+            border: 1px solid rgba(0, 0, 0, 0.35);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.22);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             opacity: 1;
+            filter: none;
             transform-origin: 0 0;
         `;
             
@@ -124,12 +141,12 @@
             const padding = window.innerWidth < 768 ? '2px' : '6px';
             
             cardElement.innerHTML = `
-            <div style="position: relative; height: 100%; background: white; border-radius: 8px;">
+            <div style="position: relative; height: 100%; background: #fff; border-radius: 8px; opacity: 1;">
                 <div style="position: absolute; top: ${padding}; left: ${padding}; display: flex; align-items: center; gap: 4px;">
                     <span style="font-size: ${fontSize}; font-weight: bold; color: ${color};">${sequenceCard.value}</span>
                     <span style="font-size: ${fontSize}; color: ${color};">${suitSymbols[sequenceCard.suit]}</span>
                 </div>
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: ${centerFontSize}; color: ${color}; opacity: 0.7;">${suitSymbols[sequenceCard.suit]}</div>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: ${centerFontSize}; color: ${color}; opacity: 0.9;">${suitSymbols[sequenceCard.suit]}</div>
                 <div style="position: absolute; bottom: ${padding}; right: ${padding}; display: flex; align-items: center; gap: 4px; transform: rotate(180deg);">
                     <span style="font-size: ${fontSize}; font-weight: bold; color: ${color};">${sequenceCard.value}</span>
                     <span style="font-size: ${fontSize}; color: ${color};">${suitSymbols[sequenceCard.suit]}</span>
@@ -139,15 +156,26 @@
             
             ghostContainer.appendChild(cardElement);
         });
+        dragPreview = ghostContainer;
         document.body.appendChild(ghostContainer);
-        event.dataTransfer.setDragImage(ghostContainer, offsetX, offsetY);
+        const transparentImage = document.createElement("canvas");
+        transparentImage.width = 1;
+        transparentImage.height = 1;
+        event.dataTransfer.setDragImage(transparentImage, 0, 0);
 
-        requestAnimationFrame(() => ghostContainer.remove());
+        dragPreviewMoveHandler = dragEvent => {
+            if (!dragPreview) return;
+            dragPreview.style.left = `${dragEvent.clientX - offsetX}px`;
+            dragPreview.style.top = `${dragEvent.clientY - offsetY}px`;
+        };
+        document.addEventListener("dragover", dragPreviewMoveHandler);
+        document.addEventListener("drop", cleanupDragPreview);
+        document.addEventListener("dragend", cleanupDragPreview);
         
     }
     
     function handleDragEnd() {
-        dragStore.reset();
+        cleanupDragPreview();
 }
     let touchStartPos = { x: 0, y: 0 };
     let touchStartTime = 0;
@@ -302,6 +330,7 @@
     
     .dragging {
         opacity: 1 !important;
+        background-color: #fff !important;
         pointer-events: none;
         z-index: 1000;
     }
@@ -312,9 +341,11 @@
     }
 
     .touch-drag-source {
+        opacity: 1 !important;
+        background-color: #fff !important;
         pointer-events: none;
         transition: none !important;
-        box-shadow: none !important;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.24) !important;
     }
     
     .face-up:hover:not(.dragging):not(.selected) {
