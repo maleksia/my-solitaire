@@ -20,6 +20,7 @@
     let showRules = false;
     let showSettings = false;
     let showWelcome = true;
+    let showEndGameConfirmation = false;
 
     function initGame() {
         showWelcome = false;
@@ -71,17 +72,18 @@
         gameStore.redo();
     }
 
-    function handleNewGame(fromWinScreen = false) {
-        if (fromWinScreen) {
-            gameStore.newGame($settingsStore.difficulty);
-            showWelcome = false;
-            return;
-        }
+    function handleEndGame() {
+        showEndGameConfirmation = true;
+    }
 
-        if (confirm("Start a new game? Current progress will be lost.")) {
-            statsStore.reset();
-            showWelcome = true;
-        }
+    function confirmEndGame() {
+        gameStore.endGame();
+        showEndGameConfirmation = false;
+    }
+
+    function startNewGame() {
+        showEndGameConfirmation = false;
+        showWelcome = true;
     }
 
     function handleRulesToggle() {
@@ -110,8 +112,8 @@
                     >
                 </div>
                 <div class="controls-area">
-                    <button class="btn primary" on:click={handleNewGame}
-                        >New Game</button
+                    <button class="btn primary" on:click={handleEndGame}
+                        >End Game</button
                     >
                     <button class="btn" on:click={() => gameStore.undo()}
                         >Undo</button
@@ -146,10 +148,34 @@
             </div>
         </div>
         <WinScreen
-            {showWelcome}
             showStats={$settingsStore.timerEnabled}
-            onNewGame={() => handleNewGame(true)}
+            onNewGame={startNewGame}
         />
+        {#if showEndGameConfirmation}
+            <div class="confirmation-overlay" role="presentation">
+                <section
+                    class="confirmation-dialog"
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-labelledby="end-game-title"
+                    aria-describedby="end-game-description"
+                >
+                    <h2 id="end-game-title">End this game?</h2>
+                    <p id="end-game-description">
+                        Your current game will end.
+                    </p>
+                    <div class="confirmation-actions">
+                        <button
+                            class="btn"
+                            on:click={() => (showEndGameConfirmation = false)}
+                        >Keep Playing</button>
+                        <button class="btn primary" on:click={confirmEndGame}>
+                            End Game
+                        </button>
+                    </div>
+                </section>
+            </div>
+        {/if}
         <Rules isOpen={showRules} on:close={() => (showRules = false)} />
         {#if showSettings}
             <SettingsPanel on:close={() => (showSettings = false)} />
@@ -257,6 +283,40 @@
 
     .btn.info {
         background: #247f8c;
+    }
+
+    .confirmation-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1100;
+        display: grid;
+        place-items: center;
+        padding: 20px;
+        background: rgba(0, 25, 22, 0.68);
+        backdrop-filter: blur(5px);
+    }
+
+    .confirmation-dialog {
+        width: min(100%, 420px);
+        padding: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 16px;
+        background: linear-gradient(155deg, #24564b, #183d37);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+        color: #fff;
+        text-align: center;
+    }
+
+    .confirmation-dialog h2 {
+        margin-top: 0;
+    }
+
+    .confirmation-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 22px;
     }
 
     .play-area {

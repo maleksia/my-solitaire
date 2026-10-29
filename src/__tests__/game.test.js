@@ -106,6 +106,21 @@ describe('Solitaire game actions', () => {
         expect(get(statsStore).currentGame.redealsUsed).toBe(1);
     });
 
+    test('ends a game and blocks further moves until a new game starts', () => {
+        setTableau([[card('K', 'hearts', 13)], []]);
+
+        gameStore.endGame();
+        expect(get(gameStore).isGameEnded).toBe(true);
+        expect(gameStore.canMoveCard(0, 1, 0)).toBe(false);
+
+        gameStore.moveCard(0, 1, 0);
+        expect(get(gameStore).tableau[0]).toHaveLength(1);
+        expect(get(gameStore).tableau[1]).toHaveLength(0);
+
+        gameStore.newGame();
+        expect(get(gameStore).isGameEnded).toBe(false);
+    });
+
     test('moves a card only when it follows the foundation suit and rank', () => {
         setTableau([[card('2', 'hearts', 2)]], [[card('A', 'hearts', 1)], [], [], []]);
 

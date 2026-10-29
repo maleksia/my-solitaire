@@ -13,6 +13,7 @@ function createGameStore() {
     selectedCard: null,
     selectedColumn: null,
     isGameWon: false,
+    isGameEnded: false,
     hasStarted: false,
     lastUpdate: Date.now(),
     winAnimation: false,
@@ -70,6 +71,7 @@ function createGameStore() {
       selectedColumn: null,
       difficulty: difficulty,
       isGameWon: false,
+      isGameEnded: false,
       lastUpdate: Date.now(),
       isPaused: false,
       winAnimation: false,
@@ -79,6 +81,7 @@ function createGameStore() {
 
   function togglePause() {
     const state = get(gameStore);
+    if (state.isGameWon || state.isGameEnded) return;
     const isPausing = !state.isPaused;
     if (isPausing) {
       statsStore.pauseTimer();
@@ -91,9 +94,24 @@ function createGameStore() {
     }));
   }
 
+  function endGame() {
+    const state = get(gameStore);
+    if (state.isGameWon || state.isGameEnded) return;
+
+    statsStore.stopTimer();
+    clearWinAnimation();
+    update(current => ({
+      ...current,
+      isGameEnded: true,
+      isPaused: false,
+      selectedCard: null,
+      selectedColumn: null
+    }));
+  }
+
   function selectCard(columnIndex, cardIndex) {
     const state = get(gameStore);
-    if (state.isPaused || state.isGameWon) return;
+    if (state.isPaused || state.isGameWon || state.isGameEnded) return;
     if (columnIndex === null || cardIndex === null) {
       update(current => ({
         ...current,
@@ -182,6 +200,7 @@ function createGameStore() {
         selectedCard: null,
         selectedColumn: null,
         isGameWon: false,
+        isGameEnded: false,
         hasStarted: false,
         isPaused: false,
         winAnimation: false,
@@ -192,7 +211,7 @@ function createGameStore() {
 
   function collectAndRedeal() {
     update(state => {
-      if (state.isPaused || state.isGameWon) return state;
+      if (state.isPaused || state.isGameWon || state.isGameEnded) return state;
       const isEasyMode = state.difficulty === 'easy';
       if (!isEasyMode && state.redealsRemaining <= 0) return state;
 
@@ -245,7 +264,7 @@ function createGameStore() {
     update(state => {
       if (fromColumn === toColumn) return state;
 
-      if (state.isPaused || state.isGameWon ||
+      if (state.isPaused || state.isGameWon || state.isGameEnded ||
         !state.tableau[fromColumn] || !state.tableau[toColumn] ||
         !Number.isInteger(cardIndex) || cardIndex < 0 ||
         cardIndex >= state.tableau[fromColumn].length) {
@@ -322,7 +341,7 @@ function createGameStore() {
 
   function moveToEndStack(fromColumn, cardIndex, stackIndex) {
     update(state => {
-      if (state.isPaused || state.isGameWon ||
+      if (state.isPaused || state.isGameWon || state.isGameEnded ||
         !state.tableau[fromColumn] || !state.endStacks[stackIndex] ||
         !Number.isInteger(cardIndex) || cardIndex < 0 ||
         cardIndex >= state.tableau[fromColumn].length) return state;
@@ -376,6 +395,7 @@ function createGameStore() {
 
   function undo() {
     const currentState = get(gameStore);
+    if (currentState.isGameEnded) return;
     const previousState = undoStore.undo(createUndoSnapshot(currentState));
     if (previousState) {
       statsStore.setMoves(previousState.moves);
@@ -401,6 +421,7 @@ function createGameStore() {
 
   function redo() {
     const currentState = get(gameStore);
+    if (currentState.isGameEnded) return;
     const nextState = undoStore.redo(createUndoSnapshot(currentState));
     if (nextState) {
       statsStore.setMoves(nextState.moves);
@@ -430,7 +451,7 @@ function createGameStore() {
 
   function moveSequenceToEndStack(fromColumn, startIndex) {
     update(state => {
-      if (state.isPaused || state.isGameWon) return state;
+      if (state.isPaused || state.isGameWon || state.isGameEnded) return state;
       const column = state.tableau[fromColumn];
       if (!column || !Number.isInteger(startIndex) ||
         startIndex < 0 || startIndex >= column.length) return state;
@@ -496,7 +517,7 @@ function createGameStore() {
 
   function canMoveCard(fromColumn, toColumn, cardIndex) {
     const state = get(gameStore);
-    if (state.isPaused || state.isGameWon ||
+    if (state.isPaused || state.isGameWon || state.isGameEnded ||
       !state.tableau[fromColumn] || !state.tableau[toColumn] ||
       !Number.isInteger(cardIndex) || cardIndex < 0 ||
       cardIndex >= state.tableau[fromColumn].length) return false;
@@ -529,7 +550,8 @@ function createGameStore() {
     newGame,
     forceRefresh,
     canMoveCard,
-    togglePause
+    togglePause,
+    endGame
   };
 
   return store;

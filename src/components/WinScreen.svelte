@@ -3,16 +3,14 @@
     import { gameStore } from "../stores/gameStore";
 
     export let onNewGame;
-    export let showWelcome;
     export let showStats = true;
 
     function handleNewGame() {
-        showWelcome = true;
         onNewGame();
     }
 </script>
 
-{#if $gameStore.isGameWon}
+{#if $gameStore.isGameWon || $gameStore.isGameEnded}
     <div
         class="win-overlay"
         on:click|stopPropagation
@@ -21,8 +19,14 @@
         aria-labelledby="win-title"
     >
         <div class="win-content">
-            <h2 id="win-title">Congratulations!</h2>
-            <p>You won the game!</p>
+            <h2 id="win-title">
+                {$gameStore.isGameWon ? "Congratulations!" : "Game ended"}
+            </h2>
+            <p>
+                {$gameStore.isGameWon
+                    ? "You won the game!"
+                    : "Here are your stats for this game."}
+            </p>
             <div class="stats">
                 {#if showStats}
                     <p>
@@ -41,7 +45,7 @@
                 <p>Games won: {$statsStore.gamesWon}</p>
             </div>
             <button class="new-game-btn" on:click={handleNewGame}>
-                Play Again
+                {$gameStore.isGameWon ? "Play Again" : "Start New Game"}
             </button>
         </div>
     </div>
